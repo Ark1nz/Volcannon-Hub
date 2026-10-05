@@ -25,7 +25,7 @@ local BloxFruitsSeas = {
 }
 
 -- 4. LINK PARA O SEU REPOSITÓRIO (Substitua SEU_USUARIO quando subir para o GitHub)
-local GithubUser = "SEU_USUARIO"
+local GithubUser = "Ark1nz"
 local MainHubUrl = "https://githubusercontent.com" .. GithubUser .. "/VolcannonHub/main/Scripts/BloxFruits/MainHub.luau"
 
 -- 5. FUNÇÃO EXECUTORA

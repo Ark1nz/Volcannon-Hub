@@ -4,7 +4,7 @@
 
 -- 1. CONFIGURAÇÕES DO SERVIDOR DO GITHUB
 -- Substitua "SEU_USUARIO" pelo seu nome real do GitHub quando publicar
-local GithubUser = "SEU_USUARIO"
+local GithubUser = "Ark1nz"
 local BaseUrl = "https://githubusercontent.com" .. GithubUser .. "/VolcannonHub/main/Scripts/BloxFruits/"
 
 -- 2. CARREGAMENTO DOS SUBMÓDULOS MODULARES (Via Internet)
