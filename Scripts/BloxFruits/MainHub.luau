@@ -2,18 +2,18 @@
 -- 🌋 VOLCANNON HUB - MAIN INTERFACE & CONTROLLER (BLOX FRUITS)
 -- =============================================================================
 
--- 1. CONFIGURAÇÕES DO SERVIDOR DO GITHUB
--- Substitua "SEU_USUARIO" pelo seu nome real do GitHub quando publicar
+-- 1. CONFIGURAÇÕES DO SEU SERVIDOR DO GITHUB
 local GithubUser = "Ark1nz"
--- Garanta que a linha abaixo termine exatamente com /Volcannon-Hub/main/Scripts/BloxFruits/
-local BaseUrl = "https://raw.githubusercontent.com/" .. GithubUser .. "/Volcannon-Hub/main/Scripts/BloxFruits/"
+-- Link ajustado para o padrão definitivo do GitHub
+local BaseUrl = "https://githubusercontent.com" .. GithubUser .. "/Volcannon-Hub/main/Scripts/BloxFruits/"
 
--- 2. CARREGAMENTO DOS SUBMÓDULOS MODULARES (Via Internet)
+-- 2. CARREGAMENTO DOS SUBMÓDULOS MODULARES (Via Internet usando game:HttpGet)
+-- Trocamos o 'readfile' por 'game:HttpGet' para o celular conseguir baixar!
 local Tween = loadstring(game:HttpGet(BaseUrl .. "TweenModule.luau"))()
 local AutoFarm = loadstring(game:HttpGet(BaseUrl .. "AutoFarm.luau"))()
 
--- 3. CARREGAMENTO DA INTERFACE GRÁFICA (Rayfield UI)
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu'))()
+-- 3. CARREGAMENTO DA INTERFACE GRÁFICA (Rayfield Estável)
+local Rayfield = loadstring(game:HttpGet('https://githubusercontent.comUI-Interface/CustomFIeld/main/RayField.lua'))()
 
 -- 4. CRIAÇÃO DA JANELA PRINCIPAL
 local Window = Rayfield:CreateWindow({
@@ -25,7 +25,7 @@ local Window = Rayfield:CreateWindow({
       FolderName = "VolcannonConfigs",
       FileName = "BloxFruits"
    },
-   KeySystem = false -- Ativaremos nas próximas etapas do projeto
+   KeySystem = false
 })
 
 -- 5. CONFIGURAÇÕES LOCAIS DO MENU
