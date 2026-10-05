@@ -1,0 +1,22 @@
+{
+    "Lua.diagnostics.globals": [
+        "game",
+        "workspace",
+        "script",
+        "shared",
+        "_G",
+        "getgenv",
+        "getfenv",
+        "setfenv",
+        "readfile",
+        "loadstring",
+        "TweenInfo",
+        "CFrame",
+        "Vector3",
+        "Instance",
+        "Color3",
+        "Enum"
+        "task"
+        
+    ],
+}
