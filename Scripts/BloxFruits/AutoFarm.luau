@@ -1,18 +1,18 @@
 -- =============================================================================
--- VOLCANNON HUB - MÓDULO DE AUTO FARM
+-- VOLCANNON HUB - MÓDULO DE AUTO FARM (CORRIGIDO)
 -- =============================================================================
 
 local AutoFarm = {}
 
--- 1. IMPORTA O SEU MÓDULO DE TELETRANSPORTE
--- (Quando rodar no celular, o Delta lê o arquivo da pasta local)
-local Tween = loadstring(readfile("Scripts/BloxFruits/TweenModule.luau"))()
+-- IMPORTANTE: Mudamos de 'readfile' para 'game:HttpGet' para rodar na nuvem!
+local GithubUser = "Ark1nz"
+local TweenUrl = "https://githubusercontent.com" .. GithubUser .. "/Volcannon-Hub/main/Scripts/BloxFruits/TweenModule.luau"
+local Tween = loadstring(game:HttpGet(TweenUrl))()
 
--- 2. VARIÁVEIS DE CONTROLE
+-- VARIÁVEIS DE CONTROLE
 local FarmAtivo = false
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-
 -- 3. FUNÇÃO PARA PEGAR A MISSÃO AUTOMATICAMENTE
 local function PegarMissao(nomeDaMissao, numeroDaMissao)
     -- O Blox Fruits usa um RemoteFunction para o jogador aceitar missões
