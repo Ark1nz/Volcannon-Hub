@@ -5,7 +5,8 @@
 -- 1. CONFIGURAÇÕES DO SERVIDOR DO GITHUB
 -- Substitua "SEU_USUARIO" pelo seu nome real do GitHub quando publicar
 local GithubUser = "Ark1nz"
-local BaseUrl = "https://githubusercontent.com" .. GithubUser .. "/VolcannonHub/main/Scripts/BloxFruits/"
+-- Garanta que a linha abaixo termine exatamente com /Volcannon-Hub/main/Scripts/BloxFruits/
+local BaseUrl = "https://raw.githubusercontent.com/" .. GithubUser .. "/Volcannon-Hub/main/Scripts/BloxFruits/"
 
 -- 2. CARREGAMENTO DOS SUBMÓDULOS MODULARES (Via Internet)
 local Tween = loadstring(game:HttpGet(BaseUrl .. "TweenModule.luau"))()
