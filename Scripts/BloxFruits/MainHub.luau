@@ -13,7 +13,7 @@ local Tween = loadstring(game:HttpGet(BaseUrl .. "TweenModule.luau"))()
 local AutoFarm = loadstring(game:HttpGet(BaseUrl .. "AutoFarm.luau"))()
 
 -- 3. CARREGAMENTO DA INTERFACE GRÁFICA (Rayfield Estável)
-local Rayfield = loadstring(game:HttpGet('https://githubusercontent.comUI-Interface/CustomFIeld/main/RayField.lua'))()
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/gen2"))()
 
 -- 4. CRIAÇÃO DA JANELA PRINCIPAL
 local Window = Rayfield:CreateWindow({
