@@ -22,7 +22,7 @@ local BloxFruitsSeas = {
 }
 
 -- LINK CORRIGIDO APONTANDO PARA O LINK RAW OFICIAL DO SEU REPOSITÓRIO
-local MainHubUrl = "https://githubusercontent.com"
+local MainHubUrl = "https://raw.githubusercontent.com/Ark1nz/Volcannon-Hub/refs/heads/main/Scripts/BloxFruits/MainHub.luau"
 
 local function CarregarVolcannon()
     local seaDetectado = BloxFruitsSeas[PlaceId]
