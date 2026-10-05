@@ -1,60 +1,326 @@
--- =============================================================================
--- VOLCANNON HUB - MÓDULO DE AUTO FARM (CORRIGIDO)
--- =============================================================================
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser = game:GetService("VirtualUser")
 
+local LocalPlayer = Players.LocalPlayer
 local AutoFarm = {}
 
--- IMPORTANTE: Mudamos de 'readfile' para 'game:HttpGet' para rodar na nuvem!
-local GithubUser = "Ark1nz"
-local TweenUrl = "https://githubusercontent.com" .. GithubUser .. "/Volcannon-Hub/main/Scripts/BloxFruits/TweenModule.luau"
-local Tween = loadstring(game:HttpGet(TweenUrl))()
+AutoFarm.OnStatus = nil -- função(texto), definida pelo MainHub
+AutoFarm.Config = {
+    Velocidade = 250,     -- studs/s nos voos longos
+    AlturaAtaque = 7,     -- distância acima do inimigo ao atacar
+    ArmaTipo = "Melee",   -- "Melee", "Sword", "Blox Fruit", "Gun"
+}
+local Config = AutoFarm.Config
 
--- VARIÁVEIS DE CONTROLE
-local FarmAtivo = false
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
--- 3. FUNÇÃO PARA PEGAR A MISSÃO AUTOMATICAMENTE
-local function PegarMissao(nomeDaMissao, numeroDaMissao)
-    -- O Blox Fruits usa um RemoteFunction para o jogador aceitar missões
-    local rFunctions = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("CommF_")
-    rFunctions:InvokeServer("StartQuest", nomeDaMissao, numeroDaMissao)
+local Tween = nil
+local Quests = {}
+local rodando = false
+local threadId = 0
+local missaoAceita = nil   -- "quest#id" aceita por este script
+local cacheMob = {}        -- última posição vista de cada mob
+local conexoes = {}
+local ultimoStatus = ""
+
+local function Status(texto)
+    if texto ~= ultimoStatus then
+        ultimoStatus = texto
+        if AutoFarm.OnStatus then pcall(AutoFarm.OnStatus, texto) end
+    end
 end
 
--- 4. LOOP PRINCIPAL DO FARM (Roda em segundo plano)
-task.spawn(function()
-    while true do
-        task.wait(1) -- Checa o objetivo a cada 1 segundo
-        
-        if FarmAtivo then
-            local Character = LocalPlayer.Character
-            local RootPart = Character and Character:FindFirstChild("HumanoidRootPart")
-            
-            if RootPart then
-                -- CONCEITO DE LOGICA:
-                -- Se o jogador não tem missão ativa, voa até o NPC e pega a missão
-                -- Se já tem a missão, voa até o monstro e ativa o Auto-Attack
-                
-                -- EXEMPLO: Farmando Bandidos (Ilha Inicial)
-                local npcQuest = workspace.NPCs:FindFirstChild("Quest Giver")
-                if npcQuest then
-                    print("🌋 Volcannon: Voando ate o NPC de Missao...")
-                    Tween:To(npcQuest.HumanoidRootPart.CFrame, 250)
-                    task.wait(2)
-                    PegarMissao("BanditQuest1", 1)
+-- ===== Utilitários =====
+
+local function Nivel()
+    local ok, v = pcall(function() return LocalPlayer.Data.Level.Value end)
+    return (ok and v) or 1
+end
+
+local function EscolherMissao(nivel)
+    local melhor = nil
+    for _, q in ipairs(Quests) do
+        if nivel >= q.min and (not melhor or q.min > melhor.min) then
+            melhor = q
+        end
+    end
+    return melhor
+end
+
+local function MissaoAtiva()
+    local ok, v = pcall(function() return LocalPlayer.PlayerGui.Main.Quest.Visible end)
+    return ok and v == true
+end
+
+local function Invocar(...)
+    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+    local commF = remotes and remotes:FindFirstChild("CommF_")
+    if not commF then
+        warn("[Volcannon] CommF_ não encontrado.")
+        return false
+    end
+    local ok, err = pcall(commF.InvokeServer, commF, ...)
+    if not ok then warn("[Volcannon] Falha no InvokeServer: " .. tostring(err)) end
+    return ok
+end
+
+local function PosicaoDoModelo(m)
+    local r = m:FindFirstChild("HumanoidRootPart") or m.PrimaryPart or m:FindFirstChildWhichIsA("BasePart")
+    return r and r.Position
+end
+
+-- ===== Inimigos =====
+
+local function AcharInimigo(mob)
+    local _, root = Tween.GetChar()
+    if not root then return nil end
+    local pasta = workspace:FindFirstChild("Enemies")
+    if not pasta then return nil end
+
+    local melhor, melhorDist = nil, math.huge
+    for _, e in ipairs(pasta:GetChildren()) do
+        if e.Name == mob then
+            local h = e:FindFirstChildOfClass("Humanoid")
+            local r = e:FindFirstChild("HumanoidRootPart")
+            if h and r and h.Health > 0 then
+                local d = (r.Position - root.Position).Magnitude
+                if d < melhorDist then
+                    melhor, melhorDist = e, d
                 end
             end
         end
     end
-end)
-
--- 5. FUNÇÃO QUE O BOTÃO DA SUA INTERFACE VAI CHAMAR
-function AutoFarm:AlternarFarm(estado)
-    FarmAtivo = estado
-    if estado then
-        print("🌋 Volcannon: Auto Farm LIGADO.")
-    else
-        print("🌋 Volcannon: Auto Farm DESLIGADO.")
+    if melhor then
+        cacheMob[mob] = melhor.HumanoidRootPart.Position
     end
+    return melhor
+end
+
+-- Posição do NPC: usa npcPos se existir; senão pega o NPC mais perto da área do mob
+local function AcharNPC(missao)
+    if missao.npcPos then
+        return CFrame.new(missao.npcPos)
+    end
+
+    local ref = missao.mobPos or cacheMob[missao.mob]
+    if not ref then
+        local e = AcharInimigo(missao.mob)
+        ref = e and e.HumanoidRootPart.Position
+    end
+    if not ref then return nil end
+
+    local npcs = workspace:FindFirstChild("NPCs")
+    if not npcs then return nil end
+
+    local melhorPos, melhorDist = nil, math.huge
+    for _, n in ipairs(npcs:GetChildren()) do
+        local p = PosicaoDoModelo(n)
+        if p then
+            local d = (p - ref).Magnitude
+            if d < melhorDist then
+                melhorPos, melhorDist = p, d
+            end
+        end
+    end
+    return melhorPos and CFrame.new(melhorPos) or nil
+end
+
+-- ===== Combate =====
+
+local function EquiparArma()
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not hum then return nil end
+
+    local tool = char:FindFirstChildOfClass("Tool")
+    if tool then return tool end
+
+    local mochila = LocalPlayer:FindFirstChildOfClass("Backpack")
+    if mochila then
+        for _, t in ipairs(mochila:GetChildren()) do
+            if t:IsA("Tool") and t.ToolTip == Config.ArmaTipo then
+                hum:EquipTool(t)
+                return t
+            end
+        end
+    end
+    return nil
+end
+
+local function Atacar(inimigo, meuId)
+    local eRoot = inimigo:FindFirstChild("HumanoidRootPart")
+    local eHum = inimigo:FindFirstChildOfClass("Humanoid")
+    if not eRoot or not eHum then return end
+
+    local offset = CFrame.new(0, Config.AlturaAtaque, 0)
+
+    local _, root = Tween.GetChar()
+    if not root then return end
+    if (root.Position - eRoot.Position).Magnitude > 60 then
+        if not Tween:To(eRoot.CFrame * offset, Config.Velocidade) then return end
+    end
+
+    while rodando and meuId == threadId and inimigo.Parent and eHum.Health > 0 and MissaoAtiva() do
+        local _, r = Tween.GetChar()
+        if not r then break end -- morreu: o loop principal cuida do respawn
+
+        Tween:Segurar(true)
+        r.CFrame = eRoot.CFrame * offset
+
+        local tool = EquiparArma()
+        if tool then pcall(function() tool:Activate() end) end
+        pcall(function()
+            VirtualUser:CaptureController()
+            VirtualUser:Button1Down(Vector2.new(1280, 672))
+        end)
+
+        task.wait(0.1)
+    end
+end
+
+-- ===== Lógica principal =====
+
+local function Passo(meuId)
+    local _, root = Tween.GetChar()
+    if not root then
+        Status("Morto/respawnando...")
+        task.wait(1)
+        return
+    end
+    Tween:Segurar(true)
+
+    local nivel = Nivel()
+    local missao = EscolherMissao(nivel)
+    if not missao then
+        Status("Sem missão cadastrada para o nível " .. nivel)
+        task.wait(2)
+        return
+    end
+    local chave = missao.quest .. "#" .. missao.id
+
+    -- Missão ativa, mas não é a que o nível pede (subiu de nível ou foi aceita antes do script)
+    if MissaoAtiva() and missaoAceita ~= chave then
+        Status("Trocando missão...")
+        Invocar("AbandonQuest")
+        missaoAceita = nil
+        task.wait(0.5)
+    end
+
+    -- Pegar missão se não houver
+    if not MissaoAtiva() then
+        local npcCF = AcharNPC(missao)
+        if not npcCF then
+            Status("NPC não encontrado para " .. missao.mob .. " (preencha npcPos)")
+            task.wait(2)
+            return
+        end
+        Status("Indo pegar missão: " .. missao.mob)
+        if not Tween:To(npcCF * CFrame.new(0, 0, 4), Config.Velocidade) then return end
+        if meuId ~= threadId then return end
+
+        task.wait(0.3)
+        Invocar("StartQuest", missao.quest, missao.id)
+        task.wait(0.6)
+
+        if not MissaoAtiva() then
+            Status("Missão não foi aceita, tentando de novo...")
+            return
+        end
+        missaoAceita = chave
+    end
+
+    -- Atacar
+    local inimigo = AcharInimigo(missao.mob)
+    if inimigo then
+        Status("Farmando: " .. missao.mob .. " (Lv " .. nivel .. ")")
+        Atacar(inimigo, meuId)
+    else
+        local alvo = missao.mobPos or cacheMob[missao.mob]
+        if alvo then
+            Status("Indo até a área de " .. missao.mob)
+            Tween:To(CFrame.new(alvo + Vector3.new(0, Config.AlturaAtaque, 0)), Config.Velocidade)
+        else
+            Status("Procurando " .. missao.mob .. "...")
+            task.wait(1)
+        end
+    end
+end
+
+-- ===== API pública =====
+
+function AutoFarm:Init(tweenModule, listaDeMissoes)
+    Tween = tweenModule
+    Quests = listaDeMissoes or {}
+
+    -- Respawn: cancela voo antigo; o loop principal retoma sozinho
+    table.insert(conexoes, LocalPlayer.CharacterAdded:Connect(function()
+        Tween:Cancel()
+        task.wait(2)
+    end))
+
+    -- Anti-AFK
+    table.insert(conexoes, LocalPlayer.Idled:Connect(function()
+        pcall(function()
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton2(Vector2.new())
+        end)
+    end))
+end
+
+function AutoFarm:AlternarFarm(estado)
+    if not Tween then
+        warn("[Volcannon] Chame AutoFarm:Init(Tween, Quests) antes.")
+        return
+    end
+    if estado == rodando then return end
+
+    rodando = estado
+    threadId = threadId + 1
+    local meuId = threadId
+
+    if not estado then
+        Tween:Cancel()
+        Tween:Segurar(false)
+        Status("Parado")
+        return
+    end
+
+    task.spawn(function()
+        while rodando and meuId == threadId do
+            local ok, err = pcall(Passo, meuId)
+            if not ok then warn("[Volcannon] Erro no farm: " .. tostring(err)) end
+            task.wait(0.2)
+        end
+    end)
+end
+
+function AutoFarm:Debug()
+    local _, root = Tween.GetChar()
+    print("[Volcannon] Nível:", Nivel(), "| Missão ativa:", MissaoActiva and "?" or MissaoAtiva())
+    print("[Volcannon] Minha posição:", root and root.Position)
+
+    local npcs = workspace:FindFirstChild("NPCs")
+    if npcs then
+        for _, n in ipairs(npcs:GetChildren()) do
+            print("NPC:", n.Name, PosicaoDoModelo(n))
+        end
+    else
+        print("workspace.NPCs não existe")
+    end
+
+    local inimigos = workspace:FindFirstChild("Enemies")
+    if inimigos then
+        for _, e in ipairs(inimigos:GetChildren()) do
+            print("Inimigo:", e.Name, PosicaoDoModelo(e))
+        end
+    else
+        print("workspace.Enemies não existe")
+    end
+end
+
+function AutoFarm:Destroy()
+    self:AlternarFarm(false)
+    for _, c in ipairs(conexoes) do c:Disconnect() end
+    table.clear(conexoes)
 end
 
 return AutoFarm

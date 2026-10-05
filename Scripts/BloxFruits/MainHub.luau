@@ -1,98 +1,174 @@
--- =============================================================================
--- 🌋 VOLCANNON HUB - MAIN INTERFACE & CONTROLLER (BLOX FRUITS)
--- =============================================================================
+--!nocheck
+--!nolint UnknownGlobal
+if getgenv().VolcannonLoaded then
+    warn("[Volcannon] Já está em execução.")
+    return
+end
+getgenv().VolcannonLoaded = true
 
--- 1. CONFIGURAÇÕES DO SEU SERVIDOR DO GITHUB
-local GithubUser = "Ark1nz"
--- Link ajustado para o padrão definitivo do GitHub
-local BaseUrl = "https://githubusercontent.com" .. GithubUser .. "/Volcannon-Hub/main/Scripts/BloxFruits/"
+local BASE = "https://raw.githubusercontent.com/Ark1nz/Volcannon-Hub/refs/heads/main/Scripts/BloxFruits/"
 
--- 2. CARREGAMENTO DOS SUBMÓDULOS MODULARES (Via Internet usando game:HttpGet)
--- Trocamos o 'readfile' por 'game:HttpGet' para o celular conseguir baixar!
-local Tween = loadstring(game:HttpGet(BaseUrl .. "TweenModule.luau"))()
-local AutoFarm = loadstring(game:HttpGet(BaseUrl .. "AutoFarm.luau"))()
+local function Baixar(url)
+    local ok, src = pcall(function()
+        return (game :: any):HttpGet(url)
+    end)
+    if not ok then
+        warn("[Volcannon] Falha ao baixar: " .. url)
+        return nil
+    end
+    local fn, err = loadstring(src)
+    if not fn then
+        warn("[Volcannon] Erro de sintaxe em " .. url .. ": " .. tostring(err))
+        return nil
+    end
+    local okRun, result = pcall(fn)
+    if not okRun then
+        warn("[Volcannon] Erro ao executar " .. url .. ": " .. tostring(result))
+        return nil
+    end
+    return result
+end
 
--- 3. CARREGAMENTO DA INTERFACE GRÁFICA (Rayfield Estável)
-local Rayfield = loadstring(game:HttpGet("https://sirius.menu/gen2"))()
+local Tween    = Baixar(BASE .. "TweenModule.luau")
+local Quests   = Baixar(BASE .. "QuestData.luau")
+local AutoFarm = Baixar(BASE .. "AutoFarm.luau")
+local Rayfield = Baixar("https://sirius.menu/rayfield")
 
--- 4. CRIAÇÃO DA JANELA PRINCIPAL
-local Window = Rayfield:CreateWindow({
-   Name = "🌋 Volcannon Hub | Blox Fruits",
-   LoadingTitle = "Volcannon Hub Loading...",
-   LoadingSubtitle = "by Volcannon Team",
-   ConfigurationSaving = {
-      Enabled = true,
-      FolderName = "VolcannonConfigs",
-      FileName = "BloxFruits"
-   },
-   KeySystem = false
-})
+if not (Tween and Quests and AutoFarm and Rayfield) then
+    getgenv().VolcannonLoaded = nil
+    return
+end
 
--- 5. CONFIGURAÇÕES LOCAIS DO MENU
-local LocalConfig = {
-    VelocidadeAtiva = false,
-    VelocidadeValor = 16
-}
+local sea = getgenv().VolcannonSea or 1
+local listaDeMissoes = Quests[sea] or {}
+AutoFarm:Init(Tween, listaDeMissoes)
 
--- 6. LOOP DE ATUALIZAÇÕES DO LOCALPLAYER (WalkSpeed)
+-- ===== Velocidade =====
+local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-RunService.Heartbeat:Connect(function()
-    local Character = game:GetService("Players").LocalPlayer.Character
-    if Character and Character:FindFirstChild("Humanoid") then
-        if LocalConfig.VelocidadeAtiva then
-            Character.Humanoid.WalkSpeed = LocalConfig.VelocidadeValor
-        end
+local LocalPlayer = Players.LocalPlayer
+local VELOCIDADE_PADRAO = 16
+local velocidadeAtiva, velocidadeValor = false, VELOCIDADE_PADRAO
+
+local function GetHumanoid()
+    local char = LocalPlayer.Character
+    return char and char:FindFirstChildOfClass("Humanoid")
+end
+
+local conexaoVelocidade = RunService.Heartbeat:Connect(function()
+    if velocidadeAtiva then
+        local hum = GetHumanoid()
+        if hum then hum.WalkSpeed = velocidadeValor end
     end
 end)
 
--- 7. CRIAÇÃO DAS ABAS VISUAIS
+-- ===== Interface =====
+local Window = Rayfield:CreateWindow({
+    Name = "🌋 Volcannon Hub | Blox Fruits",
+    LoadingTitle = "Volcannon Hub",
+    LoadingSubtitle = "Sea " .. sea,
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "VolcannonConfigs",
+        FileName = "BloxFruits",
+    },
+    KeySystem = false,
+})
+
 local FarmTab = Window:CreateTab("📜 Auto Farm", 4483362458)
 local PlayerTab = Window:CreateTab("⚡ Player", 4483362458)
 
--- 8. COMPONENTES DA ABA: "Auto Farm"
+local StatusLabel = FarmTab:CreateLabel("Status: parado")
+AutoFarm.OnStatus = function(texto)
+    StatusLabel:Set("Status: " .. texto)
+end
+
 FarmTab:CreateToggle({
-   Name = "Ativar Auto Farm (Bandits)",
-   CurrentValue = false,
-   Flag = "ToggleAutoFarm", 
-   Callback = function(Value)
-       -- Envia o comando direto para o arquivo AutoFarm.luau que carregamos no topo
-       AutoFarm:AlternarFarm(Value)
-       
-       Rayfield:Notify({
-          Title = "Volcannon Hub",
-          Content = Value and "Auto Farm iniciado com sucesso!" or "Auto Farm paralisado.",
-          Duration = 3,
-          Image = 4483362458,
-       })
-   end,
+    Name = "Auto Farm (por nível)",
+    CurrentValue = false,
+    Flag = "ToggleAutoFarm",
+    Callback = function(Value)
+        if Value and #listaDeMissoes == 0 then
+            Rayfield:Notify({
+                Title = "Volcannon Hub",
+                Content = "Sem dados de missão para o Sea " .. sea .. ".",
+                Duration = 4,
+            })
+            return
+        end
+        AutoFarm:AlternarFarm(Value)
+    end,
 })
 
--- 9. COMPONENTES DA ABA: "Player"
+FarmTab:CreateDropdown({
+    Name = "Tipo de arma",
+    Options = { "Melee", "Sword", "Blox Fruit", "Gun" },
+    CurrentOption = { "Melee" },
+    MultipleOptions = false,
+    Flag = "DropdownArma",
+    Callback = function(Option)
+        AutoFarm.Config.ArmaTipo = type(Option) == "table" and Option[1] or Option
+    end,
+})
+
+FarmTab:CreateSlider({
+    Name = "Altura do ataque",
+    Range = { 2, 30 },
+    Increment = 1,
+    Suffix = " studs",
+    CurrentValue = 7,
+    Flag = "SliderAltura",
+    Callback = function(Value)
+        AutoFarm.Config.AlturaAtaque = Value
+    end,
+})
+
+FarmTab:CreateButton({
+    Name = "Debug (imprimir NPCs/inimigos no console)",
+    Callback = function() AutoFarm:Debug() end,
+})
+
 PlayerTab:CreateToggle({
-   Name = "Ativar Super Velocidade",
-   CurrentValue = false,
-   Flag = "ToggleWalkspeed",
-   Callback = function(Value)
-       LocalConfig.VelocidadeAtiva = Value
-   end,
+    Name = "Super Velocidade",
+    CurrentValue = false,
+    Flag = "ToggleWalkspeed",
+    Callback = function(Value)
+        velocidadeAtiva = Value
+        if not Value then
+            local hum = GetHumanoid()
+            if hum then hum.WalkSpeed = VELOCIDADE_PADRAO end
+        end
+    end,
 })
 
 PlayerTab:CreateSlider({
-   Name = "Velocidade de Movimento",
-   Range = {16, 120},
-   Increment = 1,
-   Suffix = " Studs",
-   CurrentValue = 16,
-   Flag = "SliderWalkspeed",
-   Callback = function(Value)
-       LocalConfig.VelocidadeValor = Value
-   end,
+    Name = "Velocidade de Movimento",
+    Range = { 16, 120 },
+    Increment = 1,
+    Suffix = " studs",
+    CurrentValue = 16,
+    Flag = "SliderWalkspeed",
+    Callback = function(Value)
+        velocidadeValor = Value
+    end,
 })
 
--- 10. NOTIFICAÇÃO DE SUCESSO DE INICIALIZAÇÃO
-Rayfield:Notify({
-   Title = "🌋 Volcannon Hub",
-   Content = "Menu visual renderizado. Aproveite o Farm!",
-   Duration = 5,
-   Image = 4483362458,
+PlayerTab:CreateButton({
+    Name = "Fechar Hub",
+    Callback = function()
+        AutoFarm:Destroy()
+        conexaoVelocidade:Disconnect()
+        local hum = GetHumanoid()
+        if hum then hum.WalkSpeed = VELOCIDADE_PADRAO end
+        getgenv().VolcannonLoaded = nil
+        Rayfield:Destroy()
+    end,
 })
+
+Rayfield:Notify({
+    Title = "🌋 Volcannon Hub",
+    Content = "Carregado (Sea " .. sea .. ").",
+    Duration = 4,
+})
+
+Rayfield:LoadConfiguration()
