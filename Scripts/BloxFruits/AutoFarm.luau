@@ -1,3 +1,5 @@
+--!nocheck
+--!nolint UnknownGlobal
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local VirtualUser = game:GetService("VirtualUser")
@@ -64,8 +66,22 @@ local function Invocar(...)
 end
 
 local function PosicaoDoModelo(m)
+    if m:IsA("BasePart") then return m.Position end
     local r = m:FindFirstChild("HumanoidRootPart") or m.PrimaryPart or m:FindFirstChildWhichIsA("BasePart")
     return r and r.Position
+end
+
+local function PosicaoSpawn(mob)
+    local origem = workspace:FindFirstChild("_WorldOrigin")
+    local spawns = origem and origem:FindFirstChild("EnemySpawns")
+    if not spawns then return nil end
+    for _, s in ipairs(spawns:GetChildren()) do
+        if s.Name == mob or s.Name:find(mob, 1, true) then
+            local p = PosicaoDoModelo(s)
+            if p then return p end
+        end
+    end
+    return nil
 end
 
 -- ===== Inimigos =====
@@ -101,7 +117,7 @@ local function AcharNPC(missao)
         return CFrame.new(missao.npcPos)
     end
 
-    local ref = missao.mobPos or cacheMob[missao.mob]
+    local ref = missao.mobPos or cacheMob[missao.mob] or PosicaoSpawn(missao.mob)
     if not ref then
         local e = AcharInimigo(missao.mob)
         ref = e and e.HumanoidRootPart.Position
@@ -234,7 +250,7 @@ local function Passo(meuId)
         Status("Farmando: " .. missao.mob .. " (Lv " .. nivel .. ")")
         Atacar(inimigo, meuId)
     else
-        local alvo = missao.mobPos or cacheMob[missao.mob]
+        local alvo = missao.mobPos or cacheMob[missao.mob] or PosicaoSpawn(missao.mob)
         if alvo then
             Status("Indo até a área de " .. missao.mob)
             Tween:To(CFrame.new(alvo + Vector3.new(0, Config.AlturaAtaque, 0)), Config.Velocidade)
@@ -294,27 +310,36 @@ function AutoFarm:AlternarFarm(estado)
 end
 
 function AutoFarm:Debug()
+    local linhas = {}
+    local function add(t) table.insert(linhas, t) end
+
     local _, root = Tween.GetChar()
-    print("[Volcannon] Nível:", Nivel(), "| Missão ativa:", MissaoActiva and "?" or MissaoAtiva())
-    print("[Volcannon] Minha posição:", root and root.Position)
+    add("Nivel: " .. Nivel() .. " | Missao ativa: " .. tostring(MissaoAtiva()))
+    add("Minha posicao: " .. tostring(root and root.Position))
 
     local npcs = workspace:FindFirstChild("NPCs")
     if npcs then
         for _, n in ipairs(npcs:GetChildren()) do
-            print("NPC:", n.Name, PosicaoDoModelo(n))
+            add("NPC: " .. n.Name .. " " .. tostring(PosicaoDoModelo(n)))
         end
     else
-        print("workspace.NPCs não existe")
+        add("workspace.NPCs nao existe")
     end
 
-    local inimigos = workspace:FindFirstChild("Enemies")
-    if inimigos then
-        for _, e in ipairs(inimigos:GetChildren()) do
-            print("Inimigo:", e.Name, PosicaoDoModelo(e))
+    local origem = workspace:FindFirstChild("_WorldOrigin")
+    local spawns = origem and origem:FindFirstChild("EnemySpawns")
+    if spawns then
+        for _, s in ipairs(spawns:GetChildren()) do
+            add("Spawn: " .. s.Name .. " " .. tostring(PosicaoDoModelo(s)))
         end
     else
-        print("workspace.Enemies não existe")
+        add("_WorldOrigin.EnemySpawns nao existe")
     end
+
+    local texto = table.concat(linhas, "\n")
+    print(texto)
+    local copiar = (getgenv and getgenv().setclipboard) or setclipboard
+    if copiar then pcall(copiar, texto) end
 end
 
 function AutoFarm:Destroy()
