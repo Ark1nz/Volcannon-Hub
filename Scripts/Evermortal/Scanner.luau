@@ -33,7 +33,7 @@ function Scanner:Copiar(texto)
     return false
 end
 
--- Procura valores do jogador, remotes e botões relacionados a "ascend"
+-- Procura valores do jogador, remotes e botões/textos relacionados a "ascend" e "realm"
 function Scanner:Procurar()
     local out = {}
     local function add(t)
@@ -58,23 +58,24 @@ function Scanner:Procurar()
         end
     end
 
-    add("== INTERFACE com 'ascen' / 'realm' ==")
+    add("== INTERFACE com 'ascen' / 'realm' / 'stage' ==")
     local gui = LocalPlayer:FindFirstChild("PlayerGui")
     if gui then
         for _, d in ipairs(gui:GetDescendants()) do
-            local texto = ""
-            if d:IsA("TextLabel") or d:IsA("TextButton") then texto = d.Text:lower() end
+            local ehTexto = d:IsA("TextLabel") or d:IsA("TextButton")
+            local conteudo = ehTexto and d.Text or ""
+            local texto = conteudo:lower()
             local nome = d.Name:lower()
 
             if nome:find("ascen", 1, true) or texto:find("ascen", 1, true) then
-                add("UI: " .. Curto(d) .. " [" .. d.ClassName .. "] texto=" .. (d:IsA("TextLabel") or d:IsA("TextButton") and d.Text or ""))
+                add("UI: " .. Curto(d) .. " [" .. d.ClassName .. "] texto=" .. conteudo)
                 local b = d
                 while b and b ~= gui and not b:IsA("GuiButton") do b = b.Parent end
                 if b and b:IsA("GuiButton") then
                     add("BOTAO: " .. Curto(b) .. " [" .. b.ClassName .. "]")
                 end
             elseif texto:find("realm", 1, true) or texto:find("stage", 1, true) then
-                add("TEXTO: " .. Curto(d) .. " = " .. d.Text)
+                add("TEXTO: " .. Curto(d) .. " = " .. conteudo)
             end
         end
     end

@@ -7,7 +7,7 @@ local AutoAscend = {}
 AutoAscend.OnStatus = nil
 AutoAscend.Alvo = 0
 AutoAscend.Config = {
-    NivelCaminho = "",   -- ex.: Players.LocalPlayer.leaderstats.Realm  ou  Players.LocalPlayer@Realm
+    NivelCaminho = "",   -- ex.: Players.LocalPlayer.PlayerGui.Main.RealmLabel  ou  Players.LocalPlayer@Realm
     AscendCaminho = "",  -- RemoteEvent, RemoteFunction ou botão da interface
     AscendArgs = {},
     Intervalo = 5,       -- segundos entre checagens
@@ -26,7 +26,7 @@ local function Status(texto)
     end
 end
 
--- "Players.LocalPlayer.leaderstats.Realm" -> instância
+-- "Players.LocalPlayer.PlayerGui.X" -> instância
 local function Resolver(caminho)
     if type(caminho) ~= "string" or caminho == "" then return nil end
     local atual = game
@@ -69,8 +69,9 @@ local function LerNivel()
     if valor == nil then return nil, "Valor vazio" end
     if type(valor) == "number" then return valor end
 
+    -- Lê o número logo depois de "Realm"; se não houver, usa o primeiro número
     local texto = tostring(valor):gsub(",", "")
-    local n = tonumber(texto:match("%d+%.?%d*"))
+    local n = tonumber(texto:match("[Rr]ealm%s*(%d+)")) or tonumber(texto:match("%d+%.?%d*"))
     if not n then return nil, "Não achei número em: " .. tostring(valor) end
     return n
 end
@@ -144,7 +145,7 @@ function AutoAscend:Alternar(estado)
                     return
                 end
                 if nivel >= AutoAscend.Alvo then
-                    Status("Nível " .. nivel .. " >= alvo. Ascendendo...")
+                    Status("Realm " .. nivel .. " >= alvo. Ascendendo...")
                     local okA, msg = Ascender()
                     if okA then
                         Status("Ascend enviado. Aguardando " .. Config.Cooldown .. "s")
@@ -153,7 +154,7 @@ function AutoAscend:Alternar(estado)
                         Status("Falha: " .. tostring(msg))
                     end
                 else
-                    Status("Nível " .. nivel .. " / alvo " .. AutoAscend.Alvo)
+                    Status("Realm " .. nivel .. " / alvo " .. AutoAscend.Alvo)
                 end
             end)
             if not ok then warn("[Volcannon] Erro no Auto Ascend: " .. tostring(err)) end

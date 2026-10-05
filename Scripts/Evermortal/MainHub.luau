@@ -77,9 +77,9 @@ AutoAscend.OnStatus = function(texto)
 end
 
 AscendTab:CreateInput({
-    Name = "Nível alvo para ascender",
+    Name = "Realm alvo para ascender",
     CurrentValue = "",
-    PlaceholderText = "ex.: 100",
+    PlaceholderText = "ex.: 150",
     RemoveTextAfterFocusLost = false,
     Flag = "InputAlvo",
     Callback = function(Text)
@@ -97,9 +97,9 @@ AscendTab:CreateToggle({
 })
 
 AscendTab:CreateInput({
-    Name = "Caminho do nível (da aba Descoberta)",
+    Name = "Caminho do Realm (da aba Descoberta)",
     CurrentValue = "",
-    PlaceholderText = "Players.LocalPlayer.leaderstats.Realm",
+    PlaceholderText = "Players.LocalPlayer.PlayerGui....",
     RemoveTextAfterFocusLost = false,
     Flag = "InputNivelCaminho",
     Callback = function(Text)
@@ -110,7 +110,7 @@ AscendTab:CreateInput({
 AscendTab:CreateInput({
     Name = "Caminho do Ascend (remote ou botão)",
     CurrentValue = "",
-    PlaceholderText = "ReplicatedStorage.Remotes.Ascend",
+    PlaceholderText = "ReplicatedStorage....",
     RemoveTextAfterFocusLost = false,
     Flag = "InputAscendCaminho",
     Callback = function(Text)
@@ -141,9 +141,9 @@ AscendTab:CreateButton({
 local DescTab = Window:CreateTab("🔎 Descoberta", 4483362458)
 
 DescTab:CreateButton({
-    Name = "Procurar nível, remotes e botões (copia o resultado)",
+    Name = "Procurar Realm, remotes e botões (copia o resultado)",
     Callback = function()
-        local texto, copiou = Scanner:Procurar()
+        local _, copiou = Scanner:Procurar()
         Aviso("Scanner", copiou and "Resultado copiado. Cole no chat." or "Veja o resultado no console.")
     end,
 })
